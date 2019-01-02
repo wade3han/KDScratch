@@ -29,7 +29,7 @@ def get_parser():
     parser.add_argument('--num_steps', type=int, default=500)
     parser.add_argument('--batch_size', type=int, default=128)
 
-    parser.add_argument('--temperature', type=float, default=1.0)
+    parser.add_argument('--temperature', type=float, default=5.0)
     parser.add_argument('--dropoutprob', type=float, default=0.75)
 
     return parser
@@ -55,29 +55,30 @@ def main():
         teacher_model = None
         student_model = None
         if args.load_teacher_from_checkpoint:
-            teacher_model = model.TeacherModel(sess, dropout_prob=0.75, batch_size=128, learning_rate=0.001,
-                                               temperature=5)
+            teacher_model = model.TeacherModel(sess, num_steps=args.num_steps, dropout_prob=args.dropoutprob,
+                                               batch_size=128, learning_rate=0.001, temperature=args.temperature)
             flag = True
             teacher_model.load_model_from_file()
             print("Using Teacher State-------------!")
 
             stud_sess = tf.Session()
-            student_model = model.StudentModel(stud_sess, batch_size=128, learning_rate=0.001, temperature=5)
+            student_model = model.StudentModel(stud_sess, num_steps=args.num_steps, batch_size=128, learning_rate=0.001,
+                                               temperature=args.temperature)
             student_model.train(teacher_model)
 
         else:
             print("Not Using Teacher State---------!")
             stud_sess = tf.Session()
-            student_model = model.StudentModel(stud_sess, batch_size=128, learning_rate=0.001,
-                                               temperature=5, checkpoint_file='Student_raw')
+            student_model = model.StudentModel(stud_sess, num_steps=args.num_steps, batch_size=128, learning_rate=0.001,
+                                               temperature=1.0, checkpoint_file='Student_raw')
             student_model.train(teacher_model)
 
     else:
         sess = tf.Session()
         sess.run(tf.global_variables_initializer())
-        teacher_model = model.TeacherModel(sess, dropout_prob=0.75,
+        teacher_model = model.TeacherModel(sess, num_steps=args.num_steps, dropout_prob=args.dropoutprob,
                                            batch_size=128, learning_rate=0.001,
-                                           temperature=5)
+                                           temperature=args.temperature)
         teacher_model.train()
 
 
