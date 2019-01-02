@@ -1,6 +1,7 @@
 import tensorflow as tf
 import sys
 import os
+import numpy as np
 
 sys.path.append('./Utils')
 from mnist import MNIST
@@ -135,7 +136,7 @@ class TeacherModel(object):
 class StudentModel(object):
     def __init__(self, sess, num_steps=10000, num_classes=10,
                  temperature=1.0, input_height=28, input_width=28, batch_size=64, learning_rate=0.001,
-                 checkpoint_dir="MNIST_Student", checkpoint_file="Student", kd=True):
+                 checkpoint_dir="MNIST_Student", checkpoint_file="Student"):
         self.sess = sess
         self.num_hidden1 = 32
         self.num_hidden2 = 32
@@ -151,7 +152,6 @@ class StudentModel(object):
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_file = checkpoint_file
         self.checkpoint_path = os.path.join(self.checkpoint_dir, self.checkpoint_file + ".cpkt")
-        self.kd = kd
 
         # Store layer's weight and bias using var_scope
         # Using Convolutional Neural Network
@@ -188,18 +188,13 @@ class StudentModel(object):
 
             self.correct_pred = tf.equal(tf.argmax(self.prob_origin, 1), tf.argmax(self.Y, 1))
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred, tf.float32))
-            if self.kd:
-                self.op_loss_soft = tf.square(self.softmax_temperature) * \
-                                    tf.cond(self.flag,
-                                            true_fn=lambda: tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
-                                                                            logits=self.logits, labels=self.soft_Y)),
-                                            false_fn=lambda: 0.0) + tf.reduce_mean(
-                                                tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3, labels=self.Y)
-                                            )
-            else:
-                self.op_loss_soft = tf.reduce_mean(
-                    tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3, labels=self.Y)
-                )
+            self.op_loss_soft = tf.square(self.softmax_temperature) * \
+                                tf.cond(self.flag,
+                                        true_fn=lambda: tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+                                                                        logits=self.logits, labels=self.soft_Y)),
+                                        false_fn=lambda: 0.0) + tf.reduce_mean(
+                                            tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3, labels=self.Y)
+                                    )
 
             optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
             self.train_op = optimizer.minimize(self.op_loss_soft)
@@ -213,19 +208,21 @@ class StudentModel(object):
 
         for step in range(1, self.num_steps + 1):
             x_batch, y_true_batch, _ = data.random_batch(batch_size=self.batch_size)
-            soft_targets = teacher_model.predict(x_batch, self.temperature)
+            soft_targets = np.zeros((self.batch_size, self.num_classes))
+            flag = False
+            if teacher_model is not None:
+                soft_targets = teacher_model.predict(x_batch, self.temperature)
+                flag = True
 
             _ = self.sess.run(self.train_op, feed_dict={
-                self.X: x_batch, self.Y: y_true_batch, self.soft_Y: soft_targets,
-                self.softmax_temperature: self.temperature, self.flag: True
+                self.X: x_batch, self.Y: y_true_batch, self.soft_Y: soft_targets, self.softmax_temperature: self.temperature, self.flag: flag
             })
 
             if step % self.display_step == 0:
                 x_val = data.x_val
                 y_val = data.y_val
                 acc, loss = self.sess.run([self.accuracy, self.op_loss_soft], feed_dict={
-                    self.X: x_val, self.Y: y_val, self.soft_Y: soft_targets,
-                    self.softmax_temperature: 1.0, self.flag: False
+                    self.X: x_val, self.Y: y_val, self.soft_Y: soft_targets, self.softmax_temperature: 1.0, self.flag: False
                 })
                 print("Step " + str(step) + ", Validation Loss= " + "{:.4f}".format(
                     loss) + ", Validation Accuracy= " + "{:.3f}".format(acc)
