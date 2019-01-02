@@ -1,0 +1,2 @@
+model_checkpoint_path: "Teacher"
+all_model_checkpoint_paths: "Teacher"

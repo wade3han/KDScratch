@@ -1,0 +1,2 @@
+model_checkpoint_path: "Student_raw.cpkt"
+all_model_checkpoint_paths: "Student_raw.cpkt"
