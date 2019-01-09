@@ -32,15 +32,16 @@ from shake_drop import build_shake_drop_model
 from shake_shake import build_shake_shake_model
 import tensorflow as tf
 from wrn import build_wrn_model
+from resnet import ResNet
 
 tf.flags.DEFINE_string('model_name', 'wrn',
-                       'wrn, shake_shake_32, shake_shake_96, shake_shake_112, '
-                       'pyramid_net')
+		       'wrn, shake_shake_32, shake_shake_96, shake_shake_112, '
+		       'pyramid_net')
 tf.flags.DEFINE_string('checkpoint_dir', '/tmp/training', 'Training Directory.')
 tf.flags.DEFINE_string('data_path', '/tmp/data',
-                       'Directory where dataset is located.')
+		       'Directory where dataset is located.')
 tf.flags.DEFINE_string('dataset', 'cifar10',
-                       'Dataset to train with. Either cifar10 or cifar100')
+		       'Dataset to train with. Either cifar10 or cifar100')
 tf.flags.DEFINE_integer('use_cpu', 1, '1 if use CPU, else GPU.')
 
 FLAGS = tf.flags.FLAGS
@@ -92,13 +93,13 @@ def build_model(inputs, num_classes, is_training, hparams):
   with contextlib.nested(*scopes):
     if hparams.model_name == 'pyramid_net':
       logits = build_shake_drop_model(
-          inputs, num_classes, is_training)
+	  inputs, num_classes, is_training)
     elif hparams.model_name == 'wrn':
       logits = build_wrn_model(
-          inputs, num_classes, hparams.wrn_size)
+	  inputs, num_classes, hparams.wrn_size)
     elif hparams.model_name == 'shake_shake':
       logits = build_shake_shake_model(
-          inputs, num_classes, hparams, is_training)
+	  inputs, num_classes, hparams, is_training)
   return logits
 
 
@@ -117,7 +118,7 @@ class CifarModel(object):
     self._build_graph(self.images, self.labels, mode)
 
     self.init = tf.group(tf.global_variables_initializer(),
-                         tf.local_variables_initializer())
+			 tf.local_variables_initializer())
 
   def _setup_misc(self, mode):
     """Sets up miscellaneous in the cifar model constructor."""
@@ -135,7 +136,7 @@ class CifarModel(object):
       self.num_classes = 100
     self.images = tf.placeholder(tf.float32, [self.batch_size, 32, 32, 3])
     self.labels = tf.placeholder(tf.float32,
-                                 [self.batch_size, self.num_classes])
+				 [self.batch_size, self.num_classes])
 
   def assign_epoch(self, session, epoch_value):
     session.run(self._epoch_update, feed_dict={self._new_epoch: epoch_value})
@@ -153,19 +154,19 @@ class CifarModel(object):
       self.global_step = tf.train.get_or_create_global_step()
 
     self.logits = build_model(
-        images,
-        self.num_classes,
-        is_training,
-        self.hparams)
+	images,
+	self.num_classes,
+	is_training,
+	self.hparams)
     self.predictions, self.cost = helper_utils.setup_loss(
-        self.logits, labels)
+	self.logits, labels)
     self.accuracy, self.eval_op = tf.metrics.accuracy(
-        tf.argmax(labels, 1), tf.argmax(self.predictions, 1))
+	tf.argmax(labels, 1), tf.argmax(self.predictions, 1))
     self._calc_num_trainable_params()
 
     # Adds L2 weight decay to the cost
     self.cost = helper_utils.decay_weights(self.cost,
-                                           self.hparams.weight_decay_rate)
+					   self.hparams.weight_decay_rate)
 
     if is_training:
       self._build_train_op()
@@ -176,14 +177,14 @@ class CifarModel(object):
       self.saver = tf.train.Saver(max_to_keep=2)
 
     self.init = tf.group(tf.global_variables_initializer(),
-                         tf.local_variables_initializer())
+			 tf.local_variables_initializer())
 
   def _calc_num_trainable_params(self):
     self.num_trainable_params = np.sum([
-        np.prod(var.get_shape().as_list()) for var in tf.trainable_variables()
+	np.prod(var.get_shape().as_list()) for var in tf.trainable_variables()
     ])
     tf.logging.info('number of trainable params: {}'.format(
-        self.num_trainable_params))
+	self.num_trainable_params))
 
   def _build_train_op(self):
     """Builds the train op for the cifar model."""
@@ -192,19 +193,19 @@ class CifarModel(object):
     grads = tf.gradients(self.cost, tvars)
     if hparams.gradient_clipping_by_global_norm > 0.0:
       grads, norm = tf.clip_by_global_norm(
-          grads, hparams.gradient_clipping_by_global_norm)
+	  grads, hparams.gradient_clipping_by_global_norm)
       tf.summary.scalar('grad_norm', norm)
 
     # Setup the initial learning rate
     initial_lr = self.lr_rate_ph
     optimizer = tf.train.MomentumOptimizer(
-        initial_lr,
-        0.9,
-        use_nesterov=True)
+	initial_lr,
+	0.9,
+	use_nesterov=True)
 
     self.optimizer = optimizer
     apply_op = optimizer.apply_gradients(
-        zip(grads, tvars), global_step=self.global_step, name='train_step')
+	zip(grads, tvars), global_step=self.global_step, name='train_step')
     train_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies([apply_op]):
       self.train_op = tf.group(*train_ops)
@@ -231,7 +232,7 @@ class CifarModelTrainer(object):
 
     Args:
       step: If provided, creates a checkpoint with the given step
-        number, instead of overwriting the existing checkpoints.
+	number, instead of overwriting the existing checkpoints.
     """
     model_save_name = os.path.join(self.model_dir, 'model.ckpt')
     if not tf.gfile.IsDirectory(self.model_dir):
@@ -245,7 +246,7 @@ class CifarModelTrainer(object):
     if checkpoint_path is not None:
       self.saver.restore(self.session, checkpoint_path)
       tf.logging.info('Loaded child model checkpoint from %s',
-                      checkpoint_path)
+		      checkpoint_path)
     else:
       self.save_model(step=0)
 
@@ -263,18 +264,18 @@ class CifarModelTrainer(object):
     tf.logging.info('Evaluating child model in mode %s', mode)
     while True:
       try:
-        with self._new_session(model):
-          accuracy = helper_utils.eval_child_model(
-              self.session,
-              model,
-              data_loader,
-              mode)
-          tf.logging.info('Eval child model accuracy: {}'.format(accuracy))
-          # If epoch trained without raising the below errors, break
-          # from loop.
-          break
+	with self._new_session(model):
+	  accuracy = helper_utils.eval_child_model(
+	      self.session,
+	      model,
+	      data_loader,
+	      mode)
+	  tf.logging.info('Eval child model accuracy: {}'.format(accuracy))
+	  # If epoch trained without raising the below errors, break
+	  # from loop.
+	  break
       except (tf.errors.AbortedError, tf.errors.UnavailableError) as e:
-        tf.logging.info('Retryable error caught: %s.  Retrying.', e)
+	tf.logging.info('Retryable error caught: %s.  Retrying.', e)
 
     return accuracy
 
@@ -285,9 +286,9 @@ class CifarModelTrainer(object):
     # variables, and save / restore from
     # checkpoint.
     self._session = tf.Session(
-        '',
-        config=tf.ConfigProto(
-            allow_soft_placement=True, log_device_placement=False))
+	'',
+	config=tf.ConfigProto(
+	    allow_soft_placement=True, log_device_placement=False))
     self.session.run(m.init)
 
     # Load in a previous checkpoint, or save this one
@@ -295,9 +296,9 @@ class CifarModelTrainer(object):
     try:
       yield
     finally:
-      tf.Session.reset('')
+#tf.Session.reset('')
+      self._session.close()
       self._session = None
-
   def _build_models(self):
     """Builds the image models for train and eval."""
     # Determine if we should build the train and eval model. When using
@@ -329,17 +330,17 @@ class CifarModelTrainer(object):
     start_time = time.time()
     while True:
       try:
-        with self._new_session(m):
-          train_accuracy = helper_utils.run_epoch_training(
-              self.session, m, self.data_loader, curr_epoch)
-          tf.logging.info('Saving model after epoch')
-          self.save_model(step=curr_epoch)
-          break
+	with self._new_session(m):
+	  train_accuracy = helper_utils.run_epoch_training(
+	      self.session, m, self.data_loader, curr_epoch)
+	  tf.logging.info('Saving model after epoch')
+	  self.save_model(step=curr_epoch)
+	  break
       except (tf.errors.AbortedError, tf.errors.UnavailableError) as e:
-        tf.logging.info('Retryable error caught: %s.  Retrying.', e)
+	tf.logging.info('Retryable error caught: %s.  Retrying.', e)
     tf.logging.info('Finished epoch: {}'.format(curr_epoch))
     tf.logging.info('Epoch time(min): {}'.format(
-        (time.time() - start_time) / 60.0))
+	(time.time() - start_time) / 60.0))
     return train_accuracy
 
   def _compute_final_accuracies(self, meval):
@@ -357,43 +358,45 @@ class CifarModelTrainer(object):
     hparams = self.hparams
 
     # Build the child graph
-    with tf.Graph().as_default(), tf.device(
-        '/cpu:0' if FLAGS.use_cpu else '/gpu:0'):
-      self.m, self.meval = self._build_models()
+    self.m, self.meval = self._build_models()
 
-      # Figure out what epoch we are on
-      starting_epoch = self._calc_starting_epoch(self.m)
+    # Figure out what epoch we are on
+    starting_epoch = self._calc_starting_epoch(self.m)
 
-      # Run the validation error right at the beginning
+    # Run the validation error right at the beginning
+    valid_accuracy = self.eval_child_model(
+	self.meval, self.data_loader, 'val')
+    tf.logging.info('Before Training Epoch: {}     Val Acc: {}'.format(
+	starting_epoch, valid_accuracy))
+    training_accuracy = None
+
+    for curr_epoch in xrange(starting_epoch, hparams.num_epochs):
+
+      # Run one training epoch
+      training_accuracy = self._run_training_loop(self.m, curr_epoch)
+
       valid_accuracy = self.eval_child_model(
-          self.meval, self.data_loader, 'val')
-      tf.logging.info('Before Training Epoch: {}     Val Acc: {}'.format(
-          starting_epoch, valid_accuracy))
-      training_accuracy = None
+	  self.meval, self.data_loader, 'val')
+      tf.logging.info('Epoch: {}    Valid Acc: {}'.format(
+	  curr_epoch, valid_accuracy))
 
-      for curr_epoch in xrange(starting_epoch, hparams.num_epochs):
-
-        # Run one training epoch
-        training_accuracy = self._run_training_loop(self.m, curr_epoch)
-
-        valid_accuracy = self.eval_child_model(
-            self.meval, self.data_loader, 'val')
-        tf.logging.info('Epoch: {}    Valid Acc: {}'.format(
-            curr_epoch, valid_accuracy))
-
-      valid_accuracy, test_accuracy = self._compute_final_accuracies(
-          self.meval)
+    valid_accuracy, test_accuracy = self._compute_final_accuracies(
+	self.meval)
 
     tf.logging.info(
-        'Train Acc: {}    Valid Acc: {}     Test Acc: {}'.format(
-            training_accuracy, valid_accuracy, test_accuracy))
+	'Train Acc: {}    Valid Acc: {}     Test Acc: {}'.format(
+	    training_accuracy, valid_accuracy, test_accuracy))
 
   def predict(self, train_images, temperature):
     """Get teacher model's logits for training data"""
-    with self._new_session(self.m):
-      logits = self.session.run(self.m.logits, feed_dict={self.m.images: train_images})
-
-    return logits / temperature
+    if self.session is None:
+      self._session = tf.Session('', config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
+      self.session.run(self.m.init)
+      # Load in a previous checkpoint, or save this one
+      self.extract_model_spec() 
+    logits = self.session.run(self.m.logits, feed_dict={self.m.images: train_images})
+    logits = np.exp(logits / temperature)
+    return logits / np.sum(logits)
 
   @property
   def saver(self):
@@ -408,20 +411,20 @@ class CifarModelTrainer(object):
     return self._num_trainable_params
 
 class StudentModel(object):
-    def __init__(self, dataset):
+    def __init__(self, sess, dataset):
       self.sess = sess
       self.dataset = dataset
-      self.num_hidden1 = 32
-      self.num_hidden2 = 32
+      self.num_hidden1 = 128
+      self.num_hidden2 = 128
       self.batch_size = 128
       self.input_height = 32
       self.input_width = 32
-      self.num_input = 32 * 32
+      self.num_input = 3 * 32 * 32
       self.num_steps = 10000
       self.num_classes = 10
       self.temperature = 5
       self.display_step = 100
-      self.learning_rate = 0.001
+      self.learning_rate = 0.0001
       self.checkpoint_dir = "/tmp/training/wrn/"
       self.checkpoint_file = "/student"
       self.checkpoint_path = os.path.join(self.checkpoint_dir, self.checkpoint_file + ".cpkt")
@@ -429,17 +432,17 @@ class StudentModel(object):
       # Store layer's weight and bias using var_scope
       # Using Convolutional Neural Network
       with tf.variable_scope('student_weights'):
-        self.hw1 = tf.get_variable('hw1', [self.num_input, self.num_hidden1],
-                                   initializer=tf.random_normal_initializer())
-        self.hw2 = tf.get_variable('hw2', [self.num_hidden1, self.num_hidden2],
-                                   initializer=tf.random_normal_initializer())
-        self.out = tf.get_variable('out', [self.num_hidden2, self.num_classes],
-                                   initializer=tf.random_normal_initializer())
+	self.hw1 = tf.get_variable('hw1', [self.num_input, self.num_hidden1], 
+				   initializer=tf.random_normal_initializer())
+	self.hw2 = tf.get_variable('hw2', [self.num_hidden1, self.num_hidden2],
+				   initializer=tf.random_normal_initializer())
+	self.out = tf.get_variable('out', [self.num_hidden2, self.num_classes],
+				   initializer=tf.random_normal_initializer())
 
       with tf.variable_scope('student_bias'):
-        self.hb1 = tf.get_variable('hb1', [self.num_hidden1], initializer=tf.zeros_initializer())
-        self.hb2 = tf.get_variable('hb2', [self.num_hidden2], initializer=tf.zeros_initializer())
-        self.bout = tf.get_variable('out', [self.num_classes], initializer=tf.zeros_initializer())
+	self.hb1 = tf.get_variable('hb1', [self.num_hidden1], initializer=tf.zeros_initializer())
+	self.hb2 = tf.get_variable('hb2', [self.num_hidden2], initializer=tf.zeros_initializer())
+	self.bout = tf.get_variable('out', [self.num_classes], initializer=tf.zeros_initializer())
 
       self.build_model()
       self.saver = tf.train.Saver()
@@ -453,27 +456,27 @@ class StudentModel(object):
       self.softmax_temperature = tf.placeholder(tf.float32, name='temperature')
 
       with tf.variable_scope('student_network'):
-        fc1 = tf.matmul(self.X, self.hw1) + self.hb1
-        fc1 = tf.nn.relu(fc1)
-        fc2 = tf.matmul(fc1, self.hw2) + self.hb2
-        fc2 = tf.nn.relu(fc2)
-        fc3 = tf.matmul(fc2, self.out) + self.bout
+	fc1 = tf.matmul(self.X, self.hw1) + self.hb1
+	fc1 = tf.nn.relu(fc1)
+	fc2 = tf.matmul(fc1, self.hw2) + self.hb2
+	fc2 = tf.nn.relu(fc2)
+	fc3 = tf.matmul(fc2, self.out) + self.bout
 
-        self.logits = fc3 / self.softmax_temperature
-        self.prob_origin = tf.nn.softmax(fc3)
+	self.logits = fc3 / self.softmax_temperature
+	self.prob_origin = tf.nn.softmax(fc3)
 
-        self.correct_pred = tf.equal(tf.argmax(self.prob_origin, 1), tf.argmax(self.Y, 1))
-        self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred, tf.float32))
-        self.op_loss_soft = tf.square(self.softmax_temperature) * \
-                            tf.cond(self.flag,
-                                    true_fn=lambda: tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
-                                      logits=self.logits, labels=self.soft_Y)),
-                                    false_fn=lambda: 0.0) + tf.reduce_mean(
-          tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3, labels=self.Y)
-        )
+	self.correct_pred = tf.equal(tf.argmax(self.prob_origin, 1), tf.argmax(self.Y, 1))
+	self.accuracy = tf.reduce_mean(tf.cast(self.correct_pred, tf.float32))
+	self.op_loss_soft = tf.square(self.softmax_temperature) * \
+			    tf.cond(self.flag,
+				    true_fn=lambda: tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
+				      logits=self.logits, labels=self.soft_Y)),
+				    false_fn=lambda: 0.0) + tf.reduce_mean(
+	  tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3, labels=self.Y)
+	)
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-        self.train_op = optimizer.minimize(self.op_loss_soft)
+	optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+	self.train_op = optimizer.minimize(self.op_loss_soft)
 
     def train(self, teacher_model=None):
       self.sess.run(tf.global_variables_initializer())
@@ -483,39 +486,40 @@ class StudentModel(object):
       max_accuracy = 0
 
       for step in range(1, self.num_steps + 1):
-        x_batch, y_true_batch = data.random_batch()
-        soft_targets = np.zeros((self.batch_size, self.num_classes))
-        flag = False
-        if teacher_model is not None:
-          soft_targets = teacher_model.predict(x_batch, self.temperature)
-          flag = True
+	x_batch, y_true_batch = data.random_batch()
+	soft_targets = np.zeros((self.batch_size, self.num_classes))
+	flag = False
+	if teacher_model is not None:
+	  soft_targets = teacher_model.predict(x_batch, self.temperature)
+	  flag = True
+	x_batch = x_batch.reshape(-1, 3 * 32 * 32)
+	_ = self.sess.run(self.train_op, feed_dict={
+	  self.X: x_batch, self.Y: y_true_batch, self.soft_Y: soft_targets, self.softmax_temperature: self.temperature, self.flag: flag
+	})
 
-        _ = self.sess.run(self.train_op, feed_dict={
-          self.X: x_batch, self.Y: y_true_batch, self.soft_Y: soft_targets, self.softmax_temperature: self.temperature,
-          self.flag: flag
-        })
+	if step % self.display_step == 0:
+	  x_val = data.val_images
+	  x_val = x_val.reshape(-1, 3 * 32 * 32)
+	  y_val = data.val_labels
+	  acc, loss = self.sess.run([self.accuracy, self.op_loss_soft], feed_dict={
+	    self.X: x_val, self.Y: y_val, self.soft_Y: soft_targets, self.softmax_temperature: 1.0, self.flag: False
+	  })
+	  print("Step " + str(step) + ", Validation Loss= " + "{:.4f}".format(
+	    loss) + ", Validation Accuracy= " + "{:.3f}".format(acc)
+		)
 
-        if step % self.display_step == 0:
-          x_val = data.x_val
-          y_val = data.y_val
-          acc, loss = self.sess.run([self.accuracy, self.op_loss_soft], feed_dict={
-            self.X: x_val, self.Y: y_val, self.soft_Y: soft_targets, self.softmax_temperature: 1.0, self.flag: False
-          })
-          print("Step " + str(step) + ", Validation Loss= " + "{:.4f}".format(
-            loss) + ", Validation Accuracy= " + "{:.3f}".format(acc)
-                )
-
-          if acc > max_accuracy:
-            save_path = self.saver.save(self.sess, self.checkpoint_path)
-            print("Model Checkpointed to %s " % save_path)
-            max_accuracy = acc
+	  if acc > max_accuracy:
+	    save_path = self.saver.save(self.sess, self.checkpoint_path)
+	    print("Model Checkpointed to %s " % save_path)
+	    max_accuracy = acc
 
 def main(_):
+  tf.reset_default_graph()
   if FLAGS.dataset not in ['cifar10', 'cifar100']:
     raise ValueError('Invalid dataset: %s' % FLAGS.dataset)
   hparams = tf.contrib.training.HParams(
-      train_size=50000,
-      validation_size=0,
+      train_size=45000,
+      validation_size=5000,
       eval_test=1,
       dataset=FLAGS.dataset,
       data_path=FLAGS.data_path,
@@ -555,10 +559,16 @@ def main(_):
     raise ValueError('Not Valid Model Name: %s' % FLAGS.model_name)
   cifar_trainer = CifarModelTrainer(hparams)
   cifar_trainer.run_model()
-  dataset = data_utils(hparams)
-  student_model = StudentModel(dataset)
-  student_model.train(cifar_trainer)
+  tf.logging.info("Build Teacher Model!")
+  dataset = data_utils.DataSet(hparams)
+  with tf.Session() as sess:
+    student = ResNet(sess, dataset)
+    student.train(cifar_trainer)
+#student_model = StudentModel(sess, dataset)
+#   student_model.train(cifar_trainer)
 
 if __name__ == '__main__':
   tf.logging.set_verbosity(tf.logging.INFO)
   tf.app.run()
+
+# python train_cifar.py --model_name=wrn --checkpoint_dir=/tmp/training/wrn --data_path=/root/autoaugment/cifar-10-batches-py/ --dataset='cifar10' --use_cpu=0
